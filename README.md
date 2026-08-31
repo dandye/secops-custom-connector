@@ -9,6 +9,14 @@ It supports two distinct integration architectures:
 
 ---
 
+## 📚 Documentation Index
+
+* **[Architecture & Security Guide](docs/architecture.md)**: Component diagrams, data flow models, Protobuf schemas, and Identity Mapping Store (IMS) ACL enforcement.
+* **[Usage & Operations Guide](docs/usage_guide.md)**: Personas, sample Gemini Enterprise RAG queries, prompt walkthroughs, and Cloud Run / Cloud Scheduler automation patterns.
+* **[Gemini Enterprise & Agent Integration Guide](docs/gemini_enterprise_integration.md)**: Step-by-step setup for attaching Discovery Engine DataStores to Gemini Search Apps, configuring `mcpServers`, and Gemini CLI integration.
+
+---
+
 ## 🏗️ Architecture Overview
 
 ```
