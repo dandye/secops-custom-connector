@@ -146,10 +146,14 @@ class SecOpsInvestigationsMCPClient:
             if content and isinstance(content, list):
                 text_block = content[0].get("text", "")
                 if text_block:
-                    cases = json.loads(text_block)
-                    if isinstance(cases, list):
-                        return cases
-            cases = result.get("cases", [])
+                    data = json.loads(text_block)
+                    if isinstance(data, list) and data:
+                        return data
+                    if isinstance(data, dict):
+                        cases = data.get("cases") or data.get("investigations") or []
+                        if cases:
+                            return cases
+            cases = result.get("cases") or result.get("investigations") or []
             if cases:
                 return cases
             return get_mock_secops_investigations()

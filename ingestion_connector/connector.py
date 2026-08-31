@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 import json
 import logging
 
+from google.api_core.client_options import ClientOptions
 from google.api_core import exceptions as gcp_exceptions
 from google.cloud import discoveryengine_v1 as discoveryengine
 from google.cloud import storage
@@ -19,32 +20,46 @@ logger = logging.getLogger(__name__)
 
 
 def convert_investigations_to_documents(investigations: List[Dict[str, Any]]) -> List[discoveryengine.Document]:
-    """Convert SecOps Investigation records into Discovery Engine Document messages."""
+    """Convert SecOps Investigation / Case records into Discovery Engine Document messages."""
     docs: List[discoveryengine.Document] = []
     for inv in investigations:
-        title = inv.get("displayName") or f"SecOps Investigation {inv.get('id')}"
-        entities_str = ", ".join(inv.get("entities", []))
+        # Extract a clean, RFC-1034 compliant document ID
+        raw_id = str(inv.get("id") or (inv.get("name", "").split("/")[-1] if inv.get("name") else ""))
+        clean_id = raw_id.replace("_", "-").replace(":", "-") if raw_id else f"inv-{len(docs)+1}"
+
+        title = inv.get("displayName") or inv.get("title") or f"SecOps Investigation {clean_id}"
+        entities_list = inv.get("entities") or inv.get("involvedEntities") or []
+        entities_str = ", ".join(entities_list) if isinstance(entities_list, list) else str(entities_list)
+
+        verdict = inv.get("verdict") or inv.get("priority") or "UNDER_INVESTIGATION"
+        confidence = float(inv.get("confidenceScore", 0.0) or inv.get("confidence", 0.95))
+        status = inv.get("status") or inv.get("stage") or "OPEN"
+        assignee = inv.get("assignee") or inv.get("lastModifyingUserId") or "soc_analyst"
+        created_time = str(inv.get("createdTime") or inv.get("createTime") or "")
+        updated_time = str(inv.get("updatedTime") or inv.get("updateTime") or "")
+        url = inv.get("url") or f"https://chronicle.security/cases/{clean_id}"
+
         body = (
-            f"Summary: {inv.get('description', '')}\n"
-            f"Verdict: {inv.get('verdict', '')} (Confidence: {inv.get('confidenceScore', 0.0) * 100:.1f}%)\n"
-            f"Status: {inv.get('status', '')} | Assignee: {inv.get('assignee', '')}\n"
+            f"Summary: {inv.get('description', title)}\n"
+            f"Verdict: {verdict} (Confidence: {confidence * 100:.1f}%)\n"
+            f"Status: {status} | Assignee: {assignee}\n"
             f"Involved Entities: {entities_str}"
         )
         payload = {
             "title": title,
             "body": body,
-            "url": inv.get("url", f"https://chronicle.security/investigations/{inv.get('id')}"),
-            "verdict": inv.get("verdict"),
-            "confidence_score": inv.get("confidenceScore"),
-            "status": inv.get("status"),
-            "assignee": inv.get("assignee"),
-            "entities": inv.get("entities", []),
-            "created_time": inv.get("createdTime"),
-            "updated_time": inv.get("updatedTime"),
+            "url": url,
+            "verdict": verdict,
+            "confidence_score": confidence,
+            "status": status,
+            "assignee": assignee,
+            "entities": entities_list if isinstance(entities_list, list) else [entities_str],
+            "created_time": created_time,
+            "updated_time": updated_time,
             "type": "secops_investigation",
         }
         doc = discoveryengine.Document(
-            id=str(inv.get("id", f"inv_{len(docs)+1}")),
+            id=clean_id,
             json_data=json.dumps(payload),
         )
         docs.append(doc)
@@ -64,7 +79,8 @@ def get_or_create_ims_data_store(
     identity_mapping_store_id: str,
 ) -> discoveryengine.DataStore:
     """Get or create an Identity Mapping Store (IMS)."""
-    client_ims = discoveryengine.IdentityMappingStoreServiceClient()
+    client_options = ClientOptions(quota_project_id=project_id)
+    client_ims = discoveryengine.IdentityMappingStoreServiceClient(client_options=client_options)
     parent_ims = client_ims.location_path(project=project_id, location=location)
     name = f"projects/{project_id}/locations/{location}/identityMappingStores/{identity_mapping_store_id}"
 
@@ -84,11 +100,13 @@ def get_or_create_ims_data_store(
 
 
 def load_ims_data(
+    project_id: str,
     ims_store: discoveryengine.DataStore,
     id_mapping_data: List[discoveryengine.IdentityMappingEntry],
 ) -> Optional[discoveryengine.DataStore]:
     """Ingest identity mapping entries into identity store."""
-    client_ims = discoveryengine.IdentityMappingStoreServiceClient()
+    client_options = ClientOptions(quota_project_id=project_id)
+    client_ims = discoveryengine.IdentityMappingStoreServiceClient(client_options=client_options)
     inline_source = discoveryengine.ImportIdentityMappingsRequest.InlineSource(
         identity_mapping_entries=id_mapping_data
     )
@@ -115,7 +133,8 @@ def get_or_create_data_store(
     identity_mapping_store: str,
 ) -> discoveryengine.DataStore:
     """Get or create a Discovery Engine DataStore bound to an Identity Mapping Store."""
-    client = discoveryengine.DataStoreServiceClient()
+    client_options = ClientOptions(quota_project_id=project_id)
+    client = discoveryengine.DataStoreServiceClient(client_options=client_options)
     ds_name = client.data_store_path(project_id, location, data_store_id)
 
     try:
@@ -149,7 +168,8 @@ def upload_documents_inline(
     documents: List[discoveryengine.Document],
 ) -> discoveryengine.ImportDocumentsMetadata:
     """Import Document messages inline (Incremental Reconciliation)."""
-    client = discoveryengine.DocumentServiceClient()
+    client_options = ClientOptions(quota_project_id=project_id)
+    client = discoveryengine.DocumentServiceClient(client_options=client_options)
     parent = client.branch_path(
         project=project_id,
         location=location,
@@ -176,9 +196,9 @@ def convert_documents_to_jsonl(documents: List[discoveryengine.Document]) -> str
     ) + "\n"
 
 
-def upload_jsonl_to_gcs(jsonl: str, bucket_name: str, blob_name: str) -> str:
+def upload_jsonl_to_gcs(jsonl: str, bucket_name: str, blob_name: str, project_id: Optional[str] = None) -> str:
     """Upload JSONL string content to GCS."""
-    client = storage.Client()
+    client = storage.Client(project=project_id) if project_id else storage.Client()
     bucket = client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
     logger.info(f"Uploading JSONL payload to gs://{bucket_name}/{blob_name}...")
@@ -194,7 +214,8 @@ def import_documents_from_gcs(
     gcs_uri: str,
 ) -> discoveryengine.ImportDocumentsMetadata:
     """Bulk-import documents from GCS using FULL reconciliation mode."""
-    client = discoveryengine.DocumentServiceClient()
+    client_options = ClientOptions(quota_project_id=project_id)
+    client = discoveryengine.DocumentServiceClient(client_options=client_options)
     parent = client.branch_path(
         project=project_id,
         location=location,
@@ -207,7 +228,7 @@ def import_documents_from_gcs(
         gcs_source=gcs_source,
         reconciliation_mode=discoveryengine.ImportDocumentsRequest.ReconciliationMode.FULL,
     )
-    logger.info(f"Importing documents from {gcs_uri} with FULL reconciliation mode...")
+    logger.info(f"Bulk importing documents from '{gcs_uri}' via FULL reconciliation mode...")
     operation = client.import_documents(request=request)
     operation.result()
     return operation.metadata

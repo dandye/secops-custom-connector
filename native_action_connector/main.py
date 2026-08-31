@@ -36,11 +36,27 @@ def main():
 
     args = parser.parse_args()
 
+    auth_token = None
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request
+        creds, auto_project = google.auth.default(scopes=[
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/chronicle"
+        ])
+        creds.refresh(Request())
+        auth_token = creds.token
+        if args.secops_project_id == "my-secops-project" and auto_project:
+            args.secops_project_id = auto_project
+    except Exception as e:
+        logger.debug(f"ADC auto-auth note: {e}")
+
     client = NativeMCPActionClient(
         endpoint_url=args.secops_mcp_url,
         project_id=args.secops_project_id,
         customer_id=args.secops_customer_id,
         region=args.secops_region,
+        auth_token=auth_token,
     )
 
     if args.generate_config:

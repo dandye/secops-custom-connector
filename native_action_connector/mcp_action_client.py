@@ -131,10 +131,11 @@ class NativeMCPActionClient:
         if arguments is None:
             arguments = {}
 
-        if "project_id" not in arguments and self.project_id:
-            arguments["project_id"] = self.project_id
-        if "customer_id" not in arguments and self.customer_id:
-            arguments["customer_id"] = self.customer_id
+        # Add default parameters only if not already provided in either camelCase or snake_case
+        if "projectId" not in arguments and "project_id" not in arguments and self.project_id:
+            arguments["projectId"] = self.project_id
+        if "customerId" not in arguments and "customer_id" not in arguments and self.customer_id:
+            arguments["customerId"] = self.customer_id
         if "region" not in arguments and self.region:
             arguments["region"] = self.region
 

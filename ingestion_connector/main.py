@@ -72,11 +72,29 @@ def main():
 
     args = parser.parse_args()
 
+    auth_token = None
+    try:
+        import google.auth
+        from google.auth.transport.requests import Request
+        creds, auto_project = google.auth.default(scopes=[
+            "https://www.googleapis.com/auth/cloud-platform",
+            "https://www.googleapis.com/auth/chronicle"
+        ])
+        creds.refresh(Request())
+        auth_token = creds.token
+        if not args.secops_project_id and auto_project:
+            args.secops_project_id = auto_project
+        if not args.project_id and auto_project:
+            args.project_id = auto_project
+    except Exception as e:
+        logger.debug(f"ADC auto-auth note: {e}")
+
     client = SecOpsInvestigationsMCPClient(
         endpoint_url=args.secops_mcp_url,
         project_id=args.secops_project_id,
         customer_id=args.secops_customer_id,
         region=args.secops_region,
+        auth_token=auth_token,
     )
 
     if args.dry_run:
@@ -107,7 +125,7 @@ def main():
                 group_id="incident-response@company.com",
             ),
         ]
-        ims_response = load_ims_data(ims_store, sample_identity_mappings)
+        ims_response = load_ims_data(args.project_id, ims_store, sample_identity_mappings)
         print(f"Loaded {len(sample_identity_mappings)} identity mapping entries successfully.")
 
         # Step 4: Create Data Store and bind Identity Mapping Store

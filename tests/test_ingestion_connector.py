@@ -44,7 +44,8 @@ class TestIngestionConnector(unittest.TestCase):
 
         for idx, doc in enumerate(docs):
             self.assertIsInstance(doc, discoveryengine.Document)
-            self.assertEqual(doc.id, self.sample_investigations[idx]["id"])
+            expected_id = self.sample_investigations[idx]["id"].replace("_", "-")
+            self.assertEqual(doc.id, expected_id)
             self.assertTrue(doc.json_data)
 
             # Validate json_data content
