@@ -20,43 +20,80 @@ logger = logging.getLogger(__name__)
 
 
 def convert_investigations_to_documents(investigations: List[Dict[str, Any]]) -> List[discoveryengine.Document]:
-    """Convert SecOps Investigation / Case records into Discovery Engine Document messages."""
+    """Convert SecOps TINA Autonomous Investigation records into Discovery Engine Document messages."""
     docs: List[discoveryengine.Document] = []
     for inv in investigations:
         # Extract a clean, RFC-1034 compliant document ID
         raw_id = str(inv.get("id") or (inv.get("name", "").split("/")[-1] if inv.get("name") else ""))
         clean_id = raw_id.replace("_", "-").replace(":", "-") if raw_id else f"inv-{len(docs)+1}"
 
-        title = inv.get("displayName") or inv.get("title") or f"SecOps Investigation {clean_id}"
-        entities_list = inv.get("entities") or inv.get("involvedEntities") or []
-        entities_str = ", ".join(entities_list) if isinstance(entities_list, list) else str(entities_list)
+        title = inv.get("displayName") or inv.get("title") or f"SecOps TINA Investigation {clean_id}"
+        verdict = inv.get("verdict") or "UNDER_INVESTIGATION"
+        status = inv.get("status") or "STATUS_COMPLETED_SUCCESS"
+        summary = inv.get("summary") or inv.get("description") or "No investigation summary available."
 
-        verdict = inv.get("verdict") or inv.get("priority") or "UNDER_INVESTIGATION"
-        confidence = float(inv.get("confidenceScore", 0.0) or inv.get("confidence", 0.95))
-        status = inv.get("status") or inv.get("stage") or "OPEN"
-        assignee = inv.get("assignee") or inv.get("lastModifyingUserId") or "soc_analyst"
-        created_time = str(inv.get("createdTime") or inv.get("createTime") or "")
-        updated_time = str(inv.get("updatedTime") or inv.get("updateTime") or "")
-        url = inv.get("url") or f"https://chronicle.security/cases/{clean_id}"
+        time_range = inv.get("timeRange", {})
+        start_time = time_range.get("startTime", "") or str(inv.get("createdTime") or inv.get("createTime") or "")
+        end_time = time_range.get("endTime", "") or str(inv.get("updatedTime") or inv.get("updateTime") or "")
+
+        # Extract alert IDs
+        alerts_data = inv.get("alerts", {})
+        if isinstance(alerts_data, dict):
+            alert_ids = alerts_data.get("ids", [])
+        elif isinstance(alerts_data, list):
+            alert_ids = alerts_data
+        else:
+            alert_ids = [str(alerts_data)] if alerts_data else []
+
+        # Extract investigation steps
+        raw_steps = inv.get("investigationSteps", [])
+        steps_summary_list = []
+        structured_steps = []
+        for idx, step in enumerate(raw_steps, 1):
+            analysis = step.get("analysisSummary") or f"Investigation Step {idx}"
+            desc = step.get("description", "")
+            query_code = step.get("sourceMetadata", {}).get("query", {}).get("queryCode", "")
+            step_text = f"{idx}. **{analysis}**"
+            if desc:
+                step_text += f"\n   {desc}"
+            if query_code:
+                step_text += f"\n   *Telemetry Query*: `{query_code}`"
+            steps_summary_list.append(step_text)
+            structured_steps.append({
+                "step": idx,
+                "analysis_summary": analysis,
+                "description": desc,
+                "query": query_code,
+            })
+
+        steps_markdown = "\n\n".join(steps_summary_list) if steps_summary_list else "No automated execution steps recorded."
+        alerts_str = ", ".join(alert_ids) if alert_ids else "None"
 
         body = (
-            f"Summary: {inv.get('description', title)}\n"
-            f"Verdict: {verdict} (Confidence: {confidence * 100:.1f}%)\n"
-            f"Status: {status} | Assignee: {assignee}\n"
-            f"Involved Entities: {entities_str}"
+            f"# {title}\n\n"
+            f"**Autonomous Verdict**: `{verdict}` | **Status**: `{status}`\n"
+            f"**Investigation Interval**: {start_time} - {end_time}\n"
+            f"**Associated SIEM Alerts**: {alerts_str}\n\n"
+            f"## Investigation Agent Synthesis & Findings\n"
+            f"{summary}\n\n"
+            f"## Timeline & Autonomous Action Steps\n"
+            f"{steps_markdown}"
         )
+
+        url = inv.get("url") or f"https://chronicle.security/investigations/{clean_id}"
+
         payload = {
             "title": title,
             "body": body,
             "url": url,
             "verdict": verdict,
-            "confidence_score": confidence,
             "status": status,
-            "assignee": assignee,
-            "entities": entities_list if isinstance(entities_list, list) else [entities_str],
-            "created_time": created_time,
-            "updated_time": updated_time,
-            "type": "secops_investigation",
+            "summary": summary,
+            "alert_ids": alert_ids,
+            "investigation_steps": structured_steps,
+            "start_time": start_time,
+            "end_time": end_time,
+            "type": "secops_tina_investigation",
         }
         doc = discoveryengine.Document(
             id=clean_id,
