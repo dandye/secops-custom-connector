@@ -1,21 +1,21 @@
 # SecOps Custom Connectors Usage Guide
 
-This guide describes how security operations teams, SOC analysts, and AI agents utilize the **SecOps Custom Connectors** for semantic search, historical investigation retrieval, and real-time interactive threat hunting.
+This guide describes how security operations teams, SOC analysts, and AI agents use the **SecOps Custom Connectors** for semantic search, historical investigation retrieval, and real-time threat hunting.
 
 ---
 
-## 👥 Personas & Key Use Cases
+## Personas and Key Use Cases
 
-| Persona | Primary Goal | Connector Utilized | How It Is Used |
+| Persona | Primary Goal | Connector Used | How It Is Used |
 | :--- | :--- | :--- | :--- |
-| **SOC Analyst / Triage Engineer** | Rapidly investigate incoming alerts by finding similar past investigations and false-positive precedents. | **Ingestion Connector** (via Discovery Engine RAG) | Natural language queries in Gemini Enterprise search ("Have we seen `mimikatz.exe` on domain controllers before?"). |
+| **SOC Analyst / Triage Engineer** | Investigate incoming alerts by finding similar past investigations and false-positive precedents. | **Ingestion Connector** (via Discovery Engine RAG) | Natural language queries in Gemini Enterprise search ("Have we seen `mimikatz.exe` on domain controllers before?"). |
 | **Autonomous / Semi-Autonomous Agent** | Execute live telemetry searches, IoC lookups, and case modifications during a triage conversation. | **Native Action Connector** (OneMCP) | Gemini agent automatically calls `udm_search`, `get_ioc_match`, or `update_case` via JSON-RPC. |
 | **Detection Engineer** | Analyze past false positive rationales to tune YARA-L rules and reduce alert fatigue. | **Ingestion Connector** | Searches for rule names and filters by `verdict: "FALSE_POSITIVE"` to inspect model rationale. |
 | **SOC Lead / Security Admin** | Automate continuous knowledge synchronization between Google SecOps and Discovery Engine. | **Ingestion Connector** (CLI / Scheduler) | Schedules recurring incremental inline syncs or nightly GCS full reconciliations. |
 
 ---
 
-## 🔍 Use Case 1: SOC Analyst Investigation Retrieval (RAG via Gemini Enterprise)
+## Use Case 1: SOC Analyst Investigation Retrieval (RAG via Gemini Enterprise)
 
 When an analyst encounters a suspicious alert or indicator in the SOC, they query Gemini Enterprise. Discovery Engine searches the ingested TINA investigations and returns synthesized findings with citations.
 
@@ -29,7 +29,7 @@ When an analyst encounters a suspicious alert or indicator in the SOC, they quer
 > 
 > **Autonomous Verdict**: `FALSE_POSITIVE`
 > 
-> **Key Findings & Evidence**:
+> **Key Findings and Evidence**:
 > 1. **Initial Trigger**: Google Applied Threat Intelligence (ATI) flagged the file `Avl.exe` executed from `AppData\Local\Temp` by user `michelle.wright`.
 > 2. **Telemetry Sub-Queries**: TINA executed multiple secondary searches across Sysmon, Network, and Authentication logs.
 > 3. **Reasoning**: No outbound network connections, persistence mechanisms, or unauthorized privilege escalations were detected following execution.
@@ -39,7 +39,7 @@ When an analyst encounters a suspicious alert or indicator in the SOC, they quer
 
 ---
 
-#### Prompt 2: Lateral Movement & Credential Dumping Precedents
+#### Prompt 2: Lateral Movement and Credential Dumping Precedents
 > **Analyst**: *"Summarize all recent true positive credential dumping investigations on our production workstations."*
 
 **Gemini Enterprise Answer**:
@@ -54,7 +54,7 @@ When an analyst encounters a suspicious alert or indicator in the SOC, they quer
 
 ---
 
-## ⚡ Use Case 2: Query-Time Agent Tool Calling (Native Action Connector)
+## Use Case 2: Query-Time Agent Tool Calling (Native Action Connector)
 
 When Gemini Enterprise is configured with the SecOps OneMCP server, the model can execute real-time actions on Google SecOps during a conversation.
 
@@ -84,7 +84,7 @@ I ran a UDM telemetry search for `WKS-PROD-88` across these cases. Host `WKS-PRO
 
 ---
 
-## 🛠️ Use Case 3: Automated Ingestion Scheduling (Operations)
+## Use Case 3: Automated Ingestion Scheduling (Operations)
 
 For production environments, the Ingestion Connector is run on a scheduled interval to keep the Discovery Engine DataStore synchronized with live Chronicle investigations.
 

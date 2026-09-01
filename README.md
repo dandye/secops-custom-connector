@@ -1,28 +1,28 @@
 # SecOps Connectors Suite for Gemini Enterprise
-### Complete Setup, Configuration, and Deployment Guide
+### Setup, Configuration, and Deployment Guide
 
-This repository contains a production-ready solution for integrating **Google SecOps (Chronicle SIEM & SOAR)** with **Gemini Enterprise & Discovery Engine**.
+This repository contains an integration for **Google SecOps (Chronicle SIEM and SOAR)** with **Gemini Enterprise and Discovery Engine**.
 
-It supports two distinct integration architectures:
-1. **[Data Ingestion Connector](ingestion_connector/)**: Periodically harvests **SecOps Investigations** (verdicts, confidence scores, timelines, involved entities), converts them into `discoveryengine.Document` protobuf messages, and indexes them into Discovery Engine Data Stores for grounded enterprise search & RAG.
+It supports two integration architectures:
+1. **[Data Ingestion Connector](ingestion_connector/)**: Periodically harvests **SecOps Investigations** (verdicts, confidence scores, timelines, involved entities), converts them into `discoveryengine.Document` protobuf messages, and indexes them into Discovery Engine Data Stores for grounded enterprise search and RAG.
 2. **[Native Action Connector](native_action_connector/)**: Integrates **SecOps OneMCP** directly as an Agent Tool / Action Connector for live, query-time tool discovery (`tools/list`) and execution (`tools/call`) by Gemini Enterprise AI agents.
 
 ---
 
-## 📚 Documentation Index
+## Documentation Index
 
-* **[Architecture & Security Guide](docs/architecture.md)**: Component diagrams, data flow models, Protobuf schemas, and Identity Mapping Store (IMS) ACL enforcement.
-* **[Usage & Operations Guide](docs/usage_guide.md)**: Personas, sample Gemini Enterprise RAG queries, prompt walkthroughs, and Cloud Run / Cloud Scheduler automation patterns.
-* **[Gemini Enterprise & Agent Integration Guide](docs/gemini_enterprise_integration.md)**: Step-by-step setup for attaching Discovery Engine DataStores to Gemini Search Apps, configuring `mcpServers`, and Gemini CLI integration.
+* **[Architecture and Security Guide](docs/architecture.md)**: Component diagrams, data flow models, Protobuf schemas, and Identity Mapping Store (IMS) ACL enforcement.
+* **[Usage and Operations Guide](docs/usage_guide.md)**: Personas, sample Gemini Enterprise RAG queries, prompt walkthroughs, and Cloud Run / Cloud Scheduler automation patterns.
+* **[Gemini Enterprise and Agent Integration Guide](docs/gemini_enterprise_integration.md)**: Step-by-step setup for attaching Discovery Engine DataStores to Gemini Search Apps, configuring `mcpServers`, and Gemini CLI integration.
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
 +-----------------------------------------------------------------------------------+
 |                                 GOOGLE SECOPS                                     |
-|                      (Chronicle SIEM & SOAR OneMCP API)                           |
+|                      (Chronicle SIEM and SOAR OneMCP API)                         |
 +------------------------------------------+----------------------------------------+
                                            |
                    +-----------------------+-----------------------+
@@ -38,7 +38,7 @@ It supports two distinct integration architectures:
 
 ---
 
-## 📋 Prerequisites & GCP API Setup
+## Prerequisites and GCP API Setup
 
 ### 1. Enable Required Google Cloud APIs
 Ensure the following Google Cloud APIs are enabled in your GCP project:
@@ -50,20 +50,20 @@ gcloud services enable \
   mcp.googleapis.com
 ```
 
-### 2. Required IAM Roles & Permissions
+### 2. Required IAM Roles and Permissions
 Ensure your user principal or Service Account has the following IAM roles assigned:
 
 | Resource / Product | Required IAM Role | Role ID |
 | :--- | :--- | :--- |
 | **Discovery Engine** | Discovery Engine Admin | `roles/discoveryengine.admin` |
 | **Cloud Storage** | Storage Object Admin (or Viewer for GCS import) | `roles/storage.objectAdmin` |
-| **Google SecOps** | Chronicle Viewer / Editor & MCP Tool User | `roles/chronicle.viewer`, `roles/mcp.toolUser` |
+| **Google SecOps** | Chronicle Viewer / Editor and MCP Tool User | `roles/chronicle.viewer`, `roles/mcp.toolUser` |
 
 ---
 
-## ⚙️ Local Environment Setup
+## Local Environment Setup
 
-### 1. Clone & Set Up Virtual Environment
+### 1. Clone and Set Up Virtual Environment
 ```bash
 # Using 'just' (Recommended):
 just setup
@@ -83,7 +83,7 @@ gcloud config set project YOUR_GCP_PROJECT_ID
 
 ---
 
-## 🚀 1. Deploying the Ingestion Connector
+## 1. Deploying the Ingestion Connector
 
 The **Ingestion Connector** harvests SecOps Investigations via OneMCP, binds an **Identity Mapping Store (IMS)** for access control (ACLs), and indexes data into Discovery Engine.
 
@@ -123,7 +123,7 @@ PYTHONPATH=. .venv/bin/python ingestion_connector/main.py \
 
 ---
 
-## ⚡ 2. Deploying the Native Action Connector
+## 2. Deploying the Native Action Connector
 
 The **Native Action Connector** registers SecOps OneMCP as a query-time tool endpoint, allowing Gemini Enterprise agents to query SecOps tools on demand.
 
@@ -141,7 +141,7 @@ just test-action-exec tool="list_investigations"
 # Or: PYTHONPATH=. .venv/bin/python native_action_connector/main.py --call-tool list_investigations
 ```
 
-### Step 3: Generate & Deploy Gemini Enterprise `mcpServers` Configuration
+### Step 3: Generate and Deploy Gemini Enterprise `mcpServers` Configuration
 Generate the JSON configuration to register SecOps OneMCP with Gemini Enterprise or Gemini CLI:
 ```bash
 just generate-mcp-config project_id="YOUR_SECOPS_PROJECT_ID"
@@ -175,7 +175,7 @@ Copy the generated config to your extension folder (e.g. `~/.gemini/extensions/s
 
 ---
 
-## 🛠️ Complete `just` Command Reference
+## Complete `just` Command Reference
 
 | `just` Command | Parameters | Description |
 | :--- | :--- | :--- |
@@ -190,8 +190,8 @@ Copy the generated config to your extension folder (e.g. `~/.gemini/extensions/s
 
 ---
 
-## 🔒 Security & Best Practices
+## Security and Best Practices
 
 1. **OAuth Scopes**: Ensure requests include `https://www.googleapis.com/auth/chronicle` and `https://www.googleapis.com/auth/cloud-platform`.
 2. **Access Control (ACLs)**: The Ingestion Connector creates and binds an **Identity Mapping Store (IMS)** (`acl_enabled=True`) to ensure user and group permissions are respected in Gemini Enterprise search results.
-3. **Automated Scheduling**: For production deployments, run `run-ingestion-inline` or `run-ingestion-gcs` on a recurring schedule using **Cloud Scheduler**, **Kubernetes CronJob**, or a background sidecar service.
+3. **Automated Scheduling**: For production deployments, run `run-ingestion-inline` or `run-ingestion-gcs` on a recurring schedule using **Cloud Scheduler**, **Kubernetes CronJob**, or a background service.

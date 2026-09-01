@@ -4,7 +4,7 @@ This document provides a technical deep-dive into the architecture, component in
 
 ---
 
-## 🏗️ System Overview
+## System Overview
 
 The solution consists of two complementary connectors:
 
@@ -13,11 +13,11 @@ The solution consists of two complementary connectors:
 
 ```mermaid
 flowchart TB
-    subgraph GoogleSecOps["Google SecOps (Chronicle SIEM & SOAR)"]
+    subgraph GoogleSecOps["Google SecOps (Chronicle SIEM and SOAR)"]
         TINA["TINA Autonomous Investigation Agent"]
         InvAPI["InvestigationService API\n(/v1alpha/.../investigations)"]
         OneMCP["SecOps OneMCP Server\n(https://us-chronicle.googleapis.com/mcp)"]
-        SIEM_SOAR["SIEM Rules, Cases & UDM Data Lake"]
+        SIEM_SOAR["SIEM Rules, Cases and UDM Data Lake"]
         
         TINA --> InvAPI
         SIEM_SOAR --> OneMCP
@@ -41,7 +41,7 @@ flowchart TB
         end
     end
 
-    subgraph GeminiPlatform["Gemini Enterprise & Discovery Engine"]
+    subgraph GeminiPlatform["Gemini Enterprise and Discovery Engine"]
         DataStore["Discovery Engine DataStore\n(acl_enabled = true)"]
         IMS["Identity Mapping Store (IMS)"]
         SearchApp["Gemini Enterprise / Search App"]
@@ -60,11 +60,11 @@ flowchart TB
 
 ---
 
-## 📥 1. Ingestion Connector Architecture
+## 1. Ingestion Connector Architecture
 
 The Ingestion Connector runs as a scheduled or on-demand background worker that synchronizes investigation knowledge into Discovery Engine.
 
-### Data Flow & Transformation
+### Data Flow and Transformation
 
 ```mermaid
 sequenceDiagram
@@ -80,7 +80,7 @@ sequenceDiagram
     Chronicle-->>Harvester: ListInvestigationsResponse (TINA Agent Narratives, Verdicts, Steps)
     
     Harvester->>Mapper: Convert to discoveryengine.Document Protobufs
-    Mapper->>Mapper: Generate RFC-1034 Clean ID & Rich Markdown Body
+    Mapper->>Mapper: Generate RFC-1034 Clean ID and Rich Markdown Body
     
     alt Mode: Inline Sync
         Mapper->>DiscEng: DocumentServiceClient.import_documents(InlineSource)
@@ -89,11 +89,11 @@ sequenceDiagram
         Harvester->>DiscEng: DocumentServiceClient.import_documents(GcsSource, FULL Reconciliation)
     end
     
-    Harvester->>IMS: ImportIdentityMappings (User & Group ACLs)
-    DiscEng-->>DiscEng: Build Search Index & Bind IMS ACLs
+    Harvester->>IMS: ImportIdentityMappings (User and Group ACLs)
+    DiscEng-->>DiscEng: Build Search Index and Bind IMS ACLs
 ```
 
-### Document Schema & Protobuf Representation
+### Document Schema and Protobuf Representation
 
 Each investigation is mapped to `google.cloud.discoveryengine.v1.Document`:
 
@@ -116,7 +116,7 @@ The `jsonData` payload contains:
 
 ---
 
-## ⚡ 2. Native Action Connector Architecture
+## 2. Native Action Connector Architecture
 
 The Native Action Connector bridges Gemini Enterprise agents with the SecOps OneMCP server over JSON-RPC 2.0.
 
@@ -141,15 +141,15 @@ sequenceDiagram
 
 | Tool Category | Example Tools | Description |
 | :--- | :--- | :--- |
-| **Investigation & Triage** | `get_alert_latest_investigation`, `get_investigation_by_id`, `trigger_investigation` | Inspect autonomous agent verdicts, reasoning steps, or trigger new runs. |
-| **Case & Alert Management** | `list_cases`, `get_case`, `update_case`, `list_case_alerts`, `list_case_comments` | Retrieve and modify SOC cases, assignees, priorities, and stages. |
-| **Telemetry & Threat Hunting** | `udm_search`, `get_ioc_match`, `summarize_entity`, `search_entity` | Run real-time UDM queries and match indicators against threat intelligence. |
+| **Investigation and Triage** | `get_alert_latest_investigation`, `get_investigation_by_id`, `trigger_investigation` | Inspect autonomous agent verdicts, reasoning steps, or trigger new runs. |
+| **Case and Alert Management** | `list_cases`, `get_case`, `update_case`, `list_case_alerts`, `list_case_comments` | Retrieve and modify SOC cases, assignees, priorities, and stages. |
+| **Telemetry and Threat Hunting** | `udm_search`, `get_ioc_match`, `summarize_entity`, `search_entity` | Run real-time UDM queries and match indicators against threat intelligence. |
 | **Detection Engineering** | `list_rules`, `get_rule`, `create_rule`, `validate_rule`, `list_rule_detections` | Inspect and validate YARA-L detection rules. |
 | **Automated Response** | `fetch_enrichment_actions`, `execute_actions`, `execute_manual_action` | Run SOAR playbooks and entity enrichment actions. |
 
 ---
 
-## 🔒 3. Security & Access Control Model
+## 3. Security and Access Control Model
 
 ### Identity Mapping Store (IMS) and ACL Enforcement
 Enterprise search requires granular access control so analysts only see investigations and telemetry permitted by their organizational role:
@@ -158,7 +158,7 @@ Enterprise search requires granular access control so analysts only see investig
 2. **DataStore ACL Enforcement**: The Discovery Engine DataStore is created with `acl_enabled=True` and linked to the Identity Mapping Store.
 3. **Query-Time Filtering**: Search requests provide `user_info=discoveryengine.UserInfo(user_id=...)` ensuring that search results and generated RAG answers respect document-level ACLs.
 
-### Authentication & Authorization
+### Authentication and Authorization
 * **OAuth 2.0 Scopes**:
   * `https://www.googleapis.com/auth/chronicle` (Access to Chronicle SIEM, SOAR, and Investigation APIs)
   * `https://www.googleapis.com/auth/cloud-platform` (Discovery Engine and Cloud Storage API calls)
